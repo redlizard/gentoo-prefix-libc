@@ -206,6 +206,8 @@ tc-binutils_apply_patches() {
 toolchain-binutils_src_unpack() {
 	tc-binutils_unpack
 	tc-binutils_apply_patches
+
+	sed -i 's:${prefix}/etc:${sysconfdir}:' "${S}/ld/emultempl/elf32.em"
 }
 
 toolchain-binutils_src_compile() {
@@ -279,10 +281,12 @@ toolchain-binutils_src_compile() {
 		--libdir=${EPREFIX}${LIBPATH}
 		--libexecdir=${EPREFIX}${LIBPATH}
 		--includedir=${EPREFIX}${INCPATH}
+		--sysconfdir=${EPREFIX}/etc \
 		--enable-obsolete
 		--enable-shared
 		--enable-threads
 		--disable-werror
+		--with-lib-path=${EPREFIX}/usr/$(get_libdir):${EPREFIX}/$(get_libdir) \
 		--with-bugurl=http://bugs.gentoo.org/
 		$(use_enable static-libs static)
 		${EXTRA_ECONF}

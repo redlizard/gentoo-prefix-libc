@@ -1245,6 +1245,8 @@ gcc_do_configure() {
 	esac
 	fi
 
+	confgcc+=" --with-native-system-header-dir=${EPREFIX}/usr/include"
+
 	tc_version_is_at_least 4.3 && set -- "$@" \
 		--with-bugurl=http://bugs.gentoo.org/ \
 		--with-pkgversion="${BRANDING_GCC_PKGVERSION}"
@@ -1476,6 +1478,21 @@ toolchain_src_compile() {
 	if ! tc_version_is_at_least 4.4 && want_minispecs ; then
 		setup_minispecs_gcc_build_specs
 	fi
+
+	pushd "${S}" > /dev/null
+	for file in $(find gcc/config -name linux64.h -o -name linux.h -o -name sysv4.h -o -name linux-elf.h -o -name linux-eabi.h); do
+		cp -u $file{,.orig}
+		sed -e "s@/lib\(64\)\?\(32\)\?/ld@${EPREFIX}/lib/ld@g" -e "s@/usr@${EPREFIX}&@g" $file.orig > $file
+		echo "
+#undef STANDARD_STARTFILE_PREFIX_1
+#undef STANDARD_STARTFILE_PREFIX_2
+#define STANDARD_STARTFILE_PREFIX_1 \"${EPREFIX}/usr/lib/\"
+#define STANDARD_STARTFILE_PREFIX_2 \"\"
+" >> $file
+		touch $file.orig
+	done
+	popd > /dev/null
+
 	# Build in a separate build tree
 	mkdir -p "${WORKDIR}"/build
 	pushd "${WORKDIR}"/build > /dev/null
