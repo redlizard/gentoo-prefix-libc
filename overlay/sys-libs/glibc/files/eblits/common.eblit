@@ -18,7 +18,7 @@ alt_build_headers() {
 	if [[ -z ${ALT_BUILD_HEADERS} ]] ; then
 		ALT_BUILD_HEADERS=$(alt_headers)
 		if tc-is-cross-compiler ; then
-			ALT_BUILD_HEADERS=${ROOT}$(alt_headers)
+			ALT_BUILD_HEADERS=${EROOT}$(alt_headers)
 			if [[ ! -e ${ALT_BUILD_HEADERS}/linux/version.h ]] ; then
 				local header_path=$(echo '#include <linux/version.h>' | $(tc-getCPP ${CTARGET}) ${CFLAGS} 2>&1 | grep -o '[^"]*linux/version.h')
 				ALT_BUILD_HEADERS=${header_path%/linux/version.h}
@@ -259,7 +259,7 @@ setup_env() {
 	# silly users
 	unset LD_RUN_PATH
 
-	multilib_env ${CTARGET_OPT:-${CTARGET}}
+#	multilib_env ${CTARGET_OPT:-${CTARGET}}
 	if is_crosscompile || tc-is-cross-compiler ; then
 		if ! use multilib ; then
 			MULTILIB_ABIS=${DEFAULT_ABI}

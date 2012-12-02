@@ -225,12 +225,12 @@ eblit-pkg_preinst-post() {
 		# Backwards compat support for renaming hardfp ldsos #417287
 		local oldso='/lib/ld-linux.so.3'
 		local nldso='/lib/ld-linux-armhf.so.3'
-		if [[ -e ${D}${nldso} ]] ; then
-			if scanelf -qRyi "${ROOT}$(alt_prefix)"/*bin/ | grep -s "^${oldso}" ; then
+		if [[ -e ${ED}${nldso} ]] ; then
+			if scanelf -qRyi "${EROOT}$(alt_prefix)"/*bin/ | grep -s "^${oldso}" ; then
 				ewarn "Symlinking old ldso (${oldso}) to new ldso (${nldso})."
 				ewarn "Please rebuild all packages using this old ldso as compat"
 				ewarn "support will be dropped in the future."
-				ln -s "${nldso##*/}" "${D}$(alt_prefix)${oldso}"
+				ln -s "${nldso##*/}" "${ED}$(alt_prefix)${oldso}"
 			fi
 		fi
 	fi

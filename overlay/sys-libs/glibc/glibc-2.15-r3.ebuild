@@ -9,8 +9,9 @@ HOMEPAGE="http://www.gnu.org/software/libc/libc.html"
 
 LICENSE="LGPL-2"
 KEYWORDS="alpha amd64 arm -hppa ia64 ~mips ppc ppc64 s390 ~sh sparc x86"
+KEYWORDS="~ppc-aix ~x64-freebsd ~x86-freebsd ~hppa-hpux ~ia64-hpux ~x86-interix ~amd64-linux ~ia64-linux ~x86-linux ~ppc-macos ~x64-macos ~x86-macos ~m68k-mint ~sparc-solaris ~sparc64-solaris ~x64-solaris ~x86-solaris"
 RESTRICT="strip" # strip ourself #46186
-EMULTILIB_PKG="true"
+#EMULTILIB_PKG="true"
 
 # Configuration variables
 RELEASE_VER=""
@@ -217,12 +218,12 @@ eblit-pkg_preinst-post() {
 		# Backwards compat support for renaming hardfp ldsos #417287
 		local oldso='/lib/ld-linux.so.3'
 		local nldso='/lib/ld-linux-armhf.so.3'
-		if [[ -e ${D}${nldso} ]] ; then
-			if scanelf -qRyi "${ROOT}$(alt_prefix)"/*bin/ | grep -s "^${oldso}" ; then
+		if [[ -e ${ED}${nldso} ]] ; then
+			if scanelf -qRyi "${EROOT}$(alt_prefix)"/*bin/ | grep -s "^${oldso}" ; then
 				ewarn "Symlinking old ldso (${oldso}) to new ldso (${nldso})."
 				ewarn "Please rebuild all packages using this old ldso as compat"
 				ewarn "support will be dropped in the future."
-				ln -s "${nldso##*/}" "${D}$(alt_prefix)${oldso}"
+				ln -s "${nldso##*/}" "${ED}$(alt_prefix)${oldso}"
 			fi
 		fi
 	fi

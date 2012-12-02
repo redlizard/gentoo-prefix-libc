@@ -74,12 +74,13 @@ glibc_do_configure() {
 		--host=${CTARGET_OPT:-${CTARGET}}
 		$(use_enable profile)
 		$(use_with gd)
-		--with-headers=$(alt_build_headers)
-		--prefix=/usr
-		--libdir=/usr/$(get_libdir)
-		--mandir=/usr/share/man
-		--infodir=/usr/share/info
-		--libexecdir=/usr/$(get_libdir)/misc/glibc
+		--with-headers=${EPREFIX}$(alt_build_headers)
+		--prefix=${EPREFIX}/usr
+		--libdir=${EPREFIX}/usr/$(get_libdir)
+		--mandir=${EPREFIX}/usr/share/man
+		--infodir=${EPREFIX}/usr/share/info
+		--libexecdir=${EPREFIX}/usr/$(get_libdir)/misc/glibc
+		--sysconfdir=${EPREFIX}/etc
 		$(use_multiarch || echo --disable-multi-arch)
 		--enable-obsolete-rpc
 		$(in_iuse systemtap && use_enable systemtap)
@@ -87,7 +88,7 @@ glibc_do_configure() {
 
 	# There is no configure option for this and we need to export it
 	# since the glibc build will re-run configure on itself
-	export libc_cv_slibdir=/$(get_libdir)
+	export libc_cv_slibdir=${EPREFIX}/$(get_libdir)
 
 	# We take care of patching our binutils to use both hash styles,
 	# and many people like to force gnu hash style only, so disable
@@ -169,8 +170,8 @@ toolchain-glibc_headers_compile() {
 		--enable-bind-now
 		--build=${CBUILD_OPT:-${CBUILD}}
 		--host=${CTARGET_OPT:-${CTARGET}}
-		--with-headers=$(alt_build_headers)
-		--prefix=/usr
+		--with-headers=${EPREFIX}$(alt_build_headers)
+		--prefix=${EPREFIX}/usr
 		${EXTRA_ECONF}"
 
 	# Nothing is compiled here which would affect the headers for the target.
