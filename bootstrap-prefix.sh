@@ -322,7 +322,7 @@ HOSTCC='gcc -m64'
 		# this is darn ugly, but we can't use the make.globals hack,
 		# since the profiles overwrite CFLAGS/LDFLAGS in numerous cases
 		echo "${cppflags_make_defaults}" >> "${profile}"/make.defaults
-		echo "${ldflags_make_defaults}" >> "${profile}"/make.defaults
+		#echo "${ldflags_make_defaults}" >> "${profile}"/make.defaults
 		# The default profiles (and IUSE defaults) introduce circular deps. By
 		# shoving this USE line into make.defaults, we can ensure that the
 		# end-user always avoids circular deps while bootstrapping and it gets
@@ -503,7 +503,7 @@ prep_gcc-apple() {
 
 prep_gcc-fsf() {
 
-	GCC_PV=4.1.2
+	GCC_PV=4.7.2
 	GCC_A=gcc-${GCC_PV}.tar.bz2	
 	TAROPTS="-jxf"
 
@@ -561,12 +561,10 @@ bootstrap_gcc() {
 	einfo "${GCC_A%-*} successfully bootstrapped"
 }
 
-bootstrap_gnu() {
-	local PN PV A S
+fetch_gnu() {
+	local PN PV A
 	PN=$1
 	PV=$2
-
-	einfo "Bootstrapping ${PN}"
 
 	for t in tar.gz tar.xz tar.bz2 tar ; do
 		A=${PN}-${PV}.${t}
@@ -607,6 +605,17 @@ bootstrap_gnu() {
 	S="${S}"/${PN}-${PV}
 	[[ -d ${S} ]] || return 1
 	cd "${S}" || return 1
+}
+
+bootstrap_gnu() {
+	local PN PV
+	PN=$1
+	PV=$2
+
+	einfo "Bootstrapping ${PN}"
+
+	fetch_gnu $PN $PV
+	S=`pwd`
 
 	local myconf=""
 	if [[ ${PN} == "grep" ]] ; then
@@ -916,6 +925,11 @@ bootstrap_bzip2() {
 	einfo "${A%-*} successfully bootstrapped"
 }
 
+bootstrap_perl() {
+	echo "TODO: bootstrap perl"
+	return 1
+}
+
 bootstrap_stage1() {
 	if [[ ${ROOT} != */tmp ]] ; then
 		eerror "stage1 can only be used for paths that end in '/tmp'"
@@ -969,6 +983,7 @@ bootstrap_stage1() {
 		chmod 755 "${ROOT}"/usr/bin/pkg-config
 	fi
 	type -P bzip2 > /dev/null || (bootstrap_bzip2) || return 1
+	type -P perl > /dev/null || (bootstrap_perl) || return 1
 	# important to have our own (non-flawed one) since Python (from
 	# Portage) and binutils use it
 	for zlib in ${ROOT}/usr/lib/libz.* ; do
@@ -982,6 +997,144 @@ bootstrap_stage1() {
 	einfo "stage1 successfully finished"
 }
 
+prep_gcc() {
+	fetch_gnu gmp 5.0.5
+	GMP="${S}"
+
+	fetch_gnu mpfr 3.1.1
+	MPFR="${S}"
+
+	fetch_gnu mpc 1.0.1
+	MPC="${S}"
+
+	GCC_EXTRA_OPTS=
+	case ${CHOST} in
+		*-*-darwin*)
+			prep_gcc-apple
+			;;
+		*-*-solaris*)
+			prep_gcc-fsf
+			GCC_EXTRA_OPTS="--disable-multilib --with-gnu-ld"
+			;;
+		*)
+			prep_gcc-fsf
+			;;
+	esac
+
+	rm -rf "${PORTAGE_TMPDIR}/gcc-${GCC_PV}"
+	mkdir -p "${PORTAGE_TMPDIR}/gcc-${GCC_PV}"
+	cd "${PORTAGE_TMPDIR}/gcc-${GCC_PV}"
+	einfo "Unpacking ${GCC_A}"
+	$TAR ${TAROPTS} "${DISTDIR}"/${GCC_A} || return 1
+	S="${PORTAGE_TMPDIR}/gcc-${GCC_PV}/gcc-${GCC_PV}"
+	cd ${S}
+
+	mv "${GMP}" gmp
+	mv "${MPFR}" mpfr
+	mv "${MPC}" mpc
+
+	for file in $(find gcc/config -name linux64.h -o -name linux.h -o -name sysv4.h -o -name linux-elf.h -o -name linux-eabi.h); do
+		cp -u $file{,.orig}
+		sed -e "s@/lib\(64\)\?\(32\)\?/ld@${EPREFIX}/lib/ld@g" -e "s@/usr@${EPREFIX}&@g" $file.orig > $file
+		echo "
+#undef STANDARD_STARTFILE_PREFIX_1
+#undef STANDARD_STARTFILE_PREFIX_2
+#define STANDARD_STARTFILE_PREFIX_1 \"${EPREFIX}/usr/lib/\"
+#define STANDARD_STARTFILE_PREFIX_2 \"\"
+" >> $file
+		touch $file.orig
+	done
+}
+
+bootstrap_binutils_1() {
+	PN=binutils
+	PV=2.22
+	einfo "Bootstrapping ${PN}-${PV} (first pass)"
+	fetch_gnu ${PN} ${PV}
+	S=`pwd`
+
+	mkdir build
+	cd build
+
+	einfo "Compiling ${PN} (first pass)"
+	../configure \
+		--build=${XHOST} \
+		--host=${XHOST} \
+		--target=${portageCHOST} \
+		--prefix="${EPREFIX}"/tmp/usr \
+		--with-lib-path="${EPREFIX}/usr/lib:${EPREFIX}/lib" \
+		--with-sysroot=/. \
+		--disable-nls \
+		--disable-werror \
+		|| return 1
+
+	$MAKE ${MAKEOPTS} || return 1
+
+	einfo "Installing ${PN} (first pass)"
+	$MAKE install || return 1
+
+	hash -r
+	cd "${ROOT}"
+	rm -Rf "${S}"
+	einfo "${PN}-${PV} (first pass) successfully bootstrapped"
+}
+
+bootstrap_gcc_1() {
+	PN=gcc
+	einfo "Bootstrapping ${PN} (first pass)"
+
+	prep_gcc
+	sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure
+
+	rm -rf "${S}"/build
+	mkdir -p "${S}"/build
+	cd "${S}"/build
+
+	einfo "Compiling ${PN} (first pass)"
+	../configure \
+		--build=${XHOST} \
+		--host=${XHOST} \
+		--target=${portageCHOST} \
+		--prefix="${EPREFIX}"/tmp/usr \
+		--includedir="${EPREFIX}"/tmp/usr/include \
+		--with-newlib \
+		--without-headers \
+		--with-local-prefix="${EPREFIX}"/tmp \
+		--with-native-system-header-dir="${EPREFIX}"/usr/include \
+		--with-sysroot=/. \
+		--disable-multilib \
+		--disable-nls \
+		--disable-shared \
+		--disable-decimal-float \
+		--disable-threads \
+		--disable-libmudflap \
+		--disable-libssp \
+		--disable-libgomp \
+		--disable-libquadmath \
+		--enable-languages=c \
+		--disable-checking \
+		--disable-werror \
+		${GCC_EXTRA_OPTS} \
+		|| return 1
+
+	LIMITS_H="${EPREFIX}/usr/include/limits.h"
+	[[ -f ${LIMITS_H} ]] && HAVE_LIMITS_H=true || HAVE_LIMITS_H=false
+	$HAVE_LIMITS_H || touch $LIMITS_H
+
+	$MAKE ${MAKEOPTS} || return 1
+	
+	einfo "Installing ${PN} (first pass)"
+	$MAKE install || return 1
+	hash -r
+	ln -s libgcc.a `$portageCHOST-gcc -print-libgcc-file-name | sed 's/libgcc/&_eh/'`
+
+	$HAVE_LIMITS_H || rm $LIMITS_H
+
+	cd "${ROOT}"
+	rm -Rf "${S}"
+	einfo "${GCC_A%-*} (first pass) successfully bootstrapped"
+}
+
 bootstrap_stage2() {
 	if [[ ${ROOT} == */tmp ]] ; then
 		eerror "stage2 cannot be used for paths that end in '/tmp'"
@@ -990,7 +1143,14 @@ bootstrap_stage2() {
 
 	# checks itself if things need to be done still
 	bootstrap_tree || return 1
+
 	[[ -e ${ROOT}/etc/make.globals ]] || bootstrap_portage || return 1
+
+	if [[ ! -f $EPREFIX/etc/portage/make.conf ]] ; then
+		echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} $EPREFIX/../overlay\"" >> $EPREFIX/etc/portage/make.conf
+	fi
+	cp $EPREFIX/../overlay/repos.conf $ROOT/etc/portage
+	emerge --regen
 
 	einfo "stage2 successfully finished"
 }
@@ -1014,20 +1174,23 @@ bootstrap_stage3() {
 	local bootstrapCHOST=${CHOST}
 	unset CHOST
 
-	# No longer support gen_usr_ldscript stuff in new bootstraps, this
-	# must be in line with what eventually ends up in make.conf, see the
-	# end of this function.  We don't do this in bootstrap_setup()
-	# because in that case we'd also have to cater for getting this
-	# right with manual bootstraps.
-	export PREFIX_DISABLE_GEN_USR_LDSCRIPT=yes 
+	local portageCHOST=$(emerge --info 2>/dev/null | grep '^CHOST=')
+	portageCHOST=${portageCHOST#CHOST=\"}
+	portageCHOST=${portageCHOST%\"}
+	XHOST=`echo $portageCHOST | sed -e 's/-[^-]*/&_cross/'`
 
 	emerge_pkgs() {
 		local opts=$1 ; shift
 		local pkg vdb pvdb evdb
 		for pkg in "$@"; do
 			vdb=${pkg}
+			if [[ ${vdb} == *":"* ]] ; then
+				vdb=${vdb%:*}
+			fi
 			if [[ ${vdb} == "="* ]] ; then
 				vdb=${vdb#=}
+				vdb=${vdb%-*}
+				vdb=${vdb}-\*
 			elif [[ ${vdb} == "<"* ]] ; then
 				vdb=${vdb#<}
 				vdb=${vdb%-r*}
@@ -1068,82 +1231,21 @@ bootstrap_stage3() {
 		sys-devel/patch
 		sys-devel/binutils-config
 		sys-devel/gcc-config
+		sys-kernel/linux-headers:0
 	)
-
-	case ${bootstrapCHOST} in
-		*-darwin*)
-			pkgs=( ${pkgs[@]} sys-apps/darwin-miscutils )
-			case "$(gcc --version)" in
-				*"(GCC) 4.2.1 "*)
-					pkgs=( ${pkgs[@]} sys-devel/binutils-apple )
-					;;
-				*"(GCC) 4.0.1 "*)
-					pkgs=( ${pkgs[@]} "=sys-devel/binutils-apple-3.2" )
-					;;
-				*)
-					eerror "unknown GCC compiler"
-					return 1
-					;;
-			esac
-			pkgs=( ${pkgs[@]} sys-devel/gcc-apple )
-			;;
-		i?86-*-solaris*)
-			# 4.2/x86 can't cope with Sun ld/as
-			# results in a bootstrap compare mismatch
-
-			# Figure out what Solaris we're on.  Since Solaris 10u10
-			# some Solaris 11 changes have been integrated that
-			# implement some GNU extensions to ELF.  This most notably
-			# is the VERSYM_HIDDEN flag, that GCC 4.1 doesn't know
-			# about, resulting in a libstdc++.so that cannot find these
-			# hidden symbols.  GCC 4.2 knows about these, so we must
-			# have it there.  Unfortunately, 4.2 doesn't always compile,
-			# so we need to perform the expensive 4.1 -> 4.2 -> current.
-			local SOLARIS_RELEASE=$(head -n1 /etc/release)
-			local needgcc42=
-			case "${SOLARIS_RELEASE}" in
-				*"Solaris 10"*)
-					# figure out major update level
-					SOLARIS_RELEASE=${SOLARIS_RELEASE##*s10s_u}
-					SOLARIS_RELEASE=${SOLARIS_RELEASE%%wos_*}
-					if [[ "${SOLARIS_RELEASE}" -ge "10" ]] ; then
-						needgcc42="=sys-devel/gcc-4.2*"
-					fi
-					;;
-				*)
-					# assume all the rest is Oracle Solaris 11,
-					# OpenSolaris, OpenIndiana, SmartOS, whatever,
-					# thus > Solaris 10u10
-					needgcc42="=sys-devel/gcc-4.2*"
-					;;
-			esac
-
-			pkgs=(
-				${pkgs[@]}
-				sys-devel/binutils
-				"=sys-devel/gcc-4.1*"
-				${needgcc42}
-			)
-			;;
-		sparc-*-solaris2.11)
-			# unknown what the problem is here
-			pkgs=(
-				${pkgs[@]}
-				sys-devel/binutils
-				"=sys-devel/gcc-4.1*"
-				"=sys-devel/gcc-4.2*"
-			)
-			;;
-		*)
-			pkgs=(
-				${pkgs[@]}
-				sys-devel/binutils
-				"=sys-devel/gcc-4.2*"
-			)
-			;;
-	esac
-
 	emerge_pkgs --nodeps "${pkgs[@]}" || return 1
+
+	[[ -e "${EPREFIX}/tmp/usr/bin/${portageCHOST}-ld" ]] || bootstrap_binutils_1 || return 1
+	[[ -e "${EPREFIX}/tmp/usr/bin/${portageCHOST}-gcc" ]] || bootstrap_gcc_1 || return 1
+
+	LDFLAGS="" ac_cv_path_PERL=no ac_cv_header_cpuid_h=yes libc_cv_c_cleanup=yes libc_cv_ctors_header=yes libc_cv_forced_unwind=yes emerge_pkgs --nodeps "=sys-libs/glibc-2.14" || return 1
+
+	LDFLAGS="" USE=-zlib emerge_pkgs --nodeps sys-devel/binutils || return 1
+
+	CC="${portageCHOST}-gcc" emerge_pkgs --nodeps "=sys-devel/gcc-4.2*" || return 1
+
+	# TODO: Remove this when bootstrapped-portage uses the ldconfig patch
+	"${EPREFIX}"/usr/sbin/ldconfig
 
 	# we need pax-utils this early for OSX (before libiconv - gen_usr_ldscript)
 	# but also for perl, which uses scanelf/scanmacho to find compatible
@@ -1199,15 +1301,13 @@ bootstrap_stage3() {
 		rm -Rf "${ROOT}"/tmp || return 1
 		mkdir -p "${ROOT}"/tmp || return 1
 	fi
-	# note to myself: the tree MUST be synced at least once, or we'll
+	# note to myself: the tree MUST at least once be synced, or we'll
 	# carry on the polluted profile!
 	treedate=$(date -f "${ROOT}"/usr/portage/metadata/timestamp +%s)
 	nowdate=$(date +%s)
 	[[ $(< ${ROOT}/etc/portage/make.profile/make.defaults) != *"PORTAGE_SYNC_STALE"* && $((nowdate - (60 * 60 * 24))) -lt ${treedate} ]] || emerge --sync || emerge-webrsync || return 1
-
-	# activate last compiler (some Solaris cases), needed for mpc and
-	# deps below
-	gcc-config $(gcc-config -l | wc -l)
+	emerge --sync
+	emerge --regen
 
 	local cpuflags=
 	case ${bootstrapCHOST} in
@@ -1219,25 +1319,20 @@ bootstrap_stage3() {
 			;;
 	esac
 
+
 	# Portage should figure out itself what it needs to do, if anything
 	USE=-git emerge -u system || return 1
 
+	rm -f $EPREFIX/etc/portage/make.conf
+	if [[ ! -f $EPREFIX/etc/portage/make.conf ]] ; then
+		echo 'USE="unicode nls"' >> $EPREFIX/etc/portage/make.conf
+		echo 'CFLAGS="${CFLAGS} -O2 -pipe"' >> $EPREFIX/etc/portage/make.conf
+		echo 'CXXFLAGS="${CFLAGS}"' >> $EPREFIX/etc/portage/make.conf
+		echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} $EPREFIX/../overlay\"" >> $EPREFIX/etc/portage/make.conf
+	fi
+
 	# activate last compiler
 	gcc-config $(gcc-config -l | wc -l)
-
-	# remove anything that we don't need (compilers most likely)
-	emerge --depclean
-
-	if [[ ! -f ${EPREFIX}/etc/portage/make.conf ]] ; then
-		{
-			echo 'USE="unicode nls"'
-			echo 'CFLAGS="${CFLAGS} -O2 -pipe"'
-			echo 'CXXFLAGS="${CFLAGS}"'
-			echo "MAKEOPTS=\"${MAKEOPTS}\""
-			echo "# be careful with this one, don't just remove it!"
-			echo "PREFIX_DISABLE_GEN_USR_LDSCRIPT=yes"
-		} > "${EPREFIX}"/etc/portage/make.conf
-	fi
 
 	einfo "stage3 successfully finished"
 }
