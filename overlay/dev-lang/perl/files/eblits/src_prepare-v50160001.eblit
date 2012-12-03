@@ -58,6 +58,8 @@ eblit-perl-src_prepare() {
 		epatch "${WORKDIR}"/patches/${patch}
 	done < "${WORKDIR}"/patches/series
 
+	epatch "${FILESDIR}"/perl-ld-preload.patch
+
 	src_prepare_update_patchlevel_h
 
 	# pod/perltoc.pod fails
