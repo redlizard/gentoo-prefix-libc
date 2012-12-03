@@ -1114,6 +1114,8 @@ bootstrap_gcc_1() {
 		--enable-languages=c \
 		--disable-checking \
 		--disable-werror \
+		--with-mpfr-include="${S}"/mpfr/src \
+		--with-mpfr-lib="${S}"/build/mpfr/src/.libs \
 		${GCC_EXTRA_OPTS} \
 		|| return 1
 
