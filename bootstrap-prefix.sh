@@ -1120,8 +1120,7 @@ bootstrap_gcc_1() {
 		|| return 1
 
 	LIMITS_H="${EPREFIX}/usr/include/limits.h"
-	[[ -f ${LIMITS_H} ]] && HAVE_LIMITS_H=true || HAVE_LIMITS_H=false
-	$HAVE_LIMITS_H || touch $LIMITS_H
+	[[ -f ${LIMITS_H} ]] || touch $LIMITS_H
 
 	$MAKE ${MAKEOPTS} || return 1
 	
@@ -1129,8 +1128,6 @@ bootstrap_gcc_1() {
 	$MAKE install || return 1
 	hash -r
 	ln -s libgcc.a `$portageCHOST-gcc -print-libgcc-file-name | sed 's/libgcc/&_eh/'`
-
-	$HAVE_LIMITS_H || rm $LIMITS_H
 
 	cd "${ROOT}"
 	rm -Rf "${S}"
@@ -1240,9 +1237,9 @@ bootstrap_stage3() {
 	[[ -e "${EPREFIX}/tmp/usr/bin/${portageCHOST}-ld" ]] || bootstrap_binutils_1 || return 1
 	[[ -e "${EPREFIX}/tmp/usr/bin/${portageCHOST}-gcc" ]] || bootstrap_gcc_1 || return 1
 
-	LDFLAGS="" ac_cv_path_PERL=no ac_cv_header_cpuid_h=yes libc_cv_c_cleanup=yes libc_cv_ctors_header=yes libc_cv_forced_unwind=yes emerge_pkgs --nodeps "=sys-libs/glibc-2.14" || return 1
+	FEATURES=-collision-protect ac_cv_path_PERL=no ac_cv_header_cpuid_h=yes libc_cv_c_cleanup=yes libc_cv_ctors_header=yes libc_cv_forced_unwind=yes emerge_pkgs --nodeps "=sys-libs/glibc-2.14" || return 1
 
-	LDFLAGS="" USE=-zlib emerge_pkgs --nodeps sys-devel/binutils || return 1
+	USE=-zlib emerge_pkgs --nodeps sys-devel/binutils || return 1
 
 	CC="${portageCHOST}-gcc" emerge_pkgs --nodeps "=sys-devel/gcc-4.2*" || return 1
 
