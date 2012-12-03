@@ -1,0 +1,13 @@
+diff -rupN prefix-portage-2.2.01.21313.orig//pym/portage/util/env_update.py prefix-portage-2.2.01.21313/pym/portage/util/env_update.py
+--- prefix-portage-2.2.01.21313.orig//pym/portage/util/env_update.py	2012-11-22 15:43:16.000000000 +0100
++++ prefix-portage-2.2.01.21313/pym/portage/util/env_update.py	2012-11-22 15:50:29.000000000 +0100
+@@ -312,6 +312,9 @@ def _env_update(makelinks, target_root,
+ 			os.system(("cd / ; %s -elf -i " + \
+ 				"-f '%svar/run/ld-elf.so.hints' '%setc/ld.so.conf'") % \
+ 				(ldconfig, target_root, target_root))
++	elif makelinks and ldconfig:
++		writemsg_level(_(">>> Regenerating %s/etc/ld.so.cache...\n") % eprefix)
++		os.system("cd / ; %s/usr/sbin/ldconfig" % eprefix)
+ 
+ 	del specials["LDPATH"]
+ 

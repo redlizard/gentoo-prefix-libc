@@ -170,6 +170,8 @@ src_prepare() {
 	fi
 
 	epatch "${FILESDIR}"/${PN}-2.2.01.20239-ebuildshell.patch
+
+	epatch "${FILESDIR}"/${PN}-2.2.01.21313-ldconfig.patch
 }
 
 src_configure() {
