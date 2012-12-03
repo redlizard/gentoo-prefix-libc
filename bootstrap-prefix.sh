@@ -1183,34 +1183,25 @@ bootstrap_stage3() {
 		local pkg vdb pvdb evdb
 		for pkg in "$@"; do
 			vdb=${pkg}
-			if [[ ${vdb} == *":"* ]] ; then
-				vdb=${vdb%:*}
-			fi
 			if [[ ${vdb} == "="* ]] ; then
 				vdb=${vdb#=}
 				vdb=${vdb%-*}
-				vdb=${vdb}-\*
-			elif [[ ${vdb} == "<"* ]] ; then
+			fi
+			if [[ ${vdb} == "<"* ]] ; then
 				vdb=${vdb#<}
 				vdb=${vdb%-r*}
 				vdb=${vdb%-*}
-				vdb=${vdb}-\*
-			else
-				vdb=${vdb}-\*
 			fi
-			for pvdb in ${ROOT}/var/db/pkg/${vdb%-*}-* ; do
+			if [[ ${vdb} == *":"* ]] ; then
+				vdb=${vdb%:*}
+			fi
+			for pvdb in ${ROOT}/var/db/pkg/${vdb}-* ; do
 				if [[ -d ${pvdb} ]] ; then
 					evdb=${pvdb##*/}
-					if [[ ${pkg} == "="* ]] ; then
-						# exact match required (* should work here)
-						[[ ${evdb} == ${vdb##*/} ]] && break
-					else
-						vdb=${vdb%-*}
-						evdb=${evdb%-r*}
-						evdb=${evdb%_p*}
-						evdb=${evdb%-*}
-						[[ ${evdb} == ${vdb#*/} ]] && break
-					fi
+					evdb=${evdb%-r*}
+					evdb=${evdb%_p*}
+					evdb=${evdb%-*}
+					[[ ${evdb} == ${vdb#*/} ]] && break
 				fi
 				pvdb=
 			done
