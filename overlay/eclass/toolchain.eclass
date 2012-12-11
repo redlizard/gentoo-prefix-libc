@@ -1484,9 +1484,9 @@ toolchain_src_compile() {
 		cp -u $file{,.orig}
 		sed -e "s@/lib\(64\)\?\(32\)\?/ld@${EPREFIX}/lib/ld@g" -e "s@/usr@${EPREFIX}&@g" $file.orig > $file
 		echo "
-#undef STANDARD_STARTFILE_PREFIX_1
+#undef STANDARD_STARTFILE_PREFIX
 #undef STANDARD_STARTFILE_PREFIX_2
-#define STANDARD_STARTFILE_PREFIX_1 \"${EPREFIX}/usr/lib/\"
+#define STANDARD_STARTFILE_PREFIX \"${EPREFIX}/usr/lib/\"
 #define STANDARD_STARTFILE_PREFIX_2 \"\"
 " >> $file
 		touch $file.orig
