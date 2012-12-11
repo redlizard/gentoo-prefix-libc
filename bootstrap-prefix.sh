@@ -997,143 +997,6 @@ bootstrap_stage1() {
 	einfo "stage1 successfully finished"
 }
 
-prep_gcc() {
-	fetch_gnu gmp 5.0.5
-	GMP="${S}"
-
-	fetch_gnu mpfr 3.1.1
-	MPFR="${S}"
-
-	fetch_gnu mpc 1.0.1
-	MPC="${S}"
-
-	GCC_EXTRA_OPTS=
-	case ${CHOST} in
-		*-*-darwin*)
-			prep_gcc-apple
-			;;
-		*-*-solaris*)
-			prep_gcc-fsf
-			GCC_EXTRA_OPTS="--disable-multilib --with-gnu-ld"
-			;;
-		*)
-			prep_gcc-fsf
-			;;
-	esac
-
-	rm -rf "${PORTAGE_TMPDIR}/gcc-${GCC_PV}"
-	mkdir -p "${PORTAGE_TMPDIR}/gcc-${GCC_PV}"
-	cd "${PORTAGE_TMPDIR}/gcc-${GCC_PV}"
-	einfo "Unpacking ${GCC_A}"
-	$TAR ${TAROPTS} "${DISTDIR}"/${GCC_A} || return 1
-	S="${PORTAGE_TMPDIR}/gcc-${GCC_PV}/gcc-${GCC_PV}"
-	cd ${S}
-
-	mv "${GMP}" gmp
-	mv "${MPFR}" mpfr
-	mv "${MPC}" mpc
-
-	for file in $(find gcc/config -name linux64.h -o -name linux.h -o -name sysv4.h -o -name linux-elf.h -o -name linux-eabi.h); do
-		cp -u $file{,.orig}
-		sed -e "s@/lib\(64\)\?\(32\)\?/ld@${EPREFIX}/lib/ld@g" -e "s@/usr@${EPREFIX}&@g" $file.orig > $file
-		echo "
-#undef STANDARD_STARTFILE_PREFIX_1
-#undef STANDARD_STARTFILE_PREFIX_2
-#define STANDARD_STARTFILE_PREFIX_1 \"${EPREFIX}/usr/lib/\"
-#define STANDARD_STARTFILE_PREFIX_2 \"\"
-" >> $file
-		touch $file.orig
-	done
-}
-
-bootstrap_binutils_1() {
-	PN=binutils
-	PV=2.22
-	einfo "Bootstrapping ${PN}-${PV} (first pass)"
-	fetch_gnu ${PN} ${PV}
-	S=`pwd`
-
-	mkdir build
-	cd build
-
-	einfo "Compiling ${PN} (first pass)"
-	../configure \
-		--build=${XHOST} \
-		--host=${XHOST} \
-		--target=${portageCHOST} \
-		--prefix="${EPREFIX}"/tmp/usr \
-		--with-lib-path="${EPREFIX}/usr/lib:${EPREFIX}/lib" \
-		--with-sysroot=/. \
-		--disable-nls \
-		--disable-werror \
-		|| return 1
-
-	$MAKE ${MAKEOPTS} || return 1
-
-	einfo "Installing ${PN} (first pass)"
-	$MAKE install || return 1
-
-	hash -r
-	cd "${ROOT}"
-	rm -Rf "${S}"
-	einfo "${PN}-${PV} (first pass) successfully bootstrapped"
-}
-
-bootstrap_gcc_1() {
-	PN=gcc
-	einfo "Bootstrapping ${PN} (first pass)"
-
-	prep_gcc
-	sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure
-
-	rm -rf "${S}"/build
-	mkdir -p "${S}"/build
-	cd "${S}"/build
-
-	einfo "Compiling ${PN} (first pass)"
-	../configure \
-		--build=${XHOST} \
-		--host=${XHOST} \
-		--target=${portageCHOST} \
-		--prefix="${EPREFIX}"/tmp/usr \
-		--includedir="${EPREFIX}"/tmp/usr/include \
-		--with-newlib \
-		--without-headers \
-		--with-local-prefix="${EPREFIX}"/tmp \
-		--with-native-system-header-dir="${EPREFIX}"/usr/include \
-		--with-sysroot=/. \
-		--disable-multilib \
-		--disable-nls \
-		--disable-shared \
-		--disable-decimal-float \
-		--disable-threads \
-		--disable-libmudflap \
-		--disable-libssp \
-		--disable-libgomp \
-		--disable-libquadmath \
-		--enable-languages=c \
-		--disable-checking \
-		--disable-werror \
-		--with-mpfr-include="${S}"/mpfr/src \
-		--with-mpfr-lib="${S}"/build/mpfr/src/.libs \
-		${GCC_EXTRA_OPTS} \
-		|| return 1
-
-	LIMITS_H="${EPREFIX}/usr/include/limits.h"
-	[[ -f ${LIMITS_H} ]] || touch $LIMITS_H
-
-	$MAKE ${MAKEOPTS} || return 1
-	
-	einfo "Installing ${PN} (first pass)"
-	$MAKE install || return 1
-	hash -r
-	ln -s libgcc.a `$portageCHOST-gcc -print-libgcc-file-name | sed 's/libgcc/&_eh/'`
-
-	cd "${ROOT}"
-	rm -Rf "${S}"
-	einfo "${GCC_A%-*} (first pass) successfully bootstrapped"
-}
-
 bootstrap_stage2() {
 	if [[ ${ROOT} == */tmp ]] ; then
 		eerror "stage2 cannot be used for paths that end in '/tmp'"
@@ -1173,11 +1036,6 @@ bootstrap_stage3() {
 	local bootstrapCHOST=${CHOST}
 	unset CHOST
 
-	local portageCHOST=$(emerge --info 2>/dev/null | grep '^CHOST=')
-	portageCHOST=${portageCHOST#CHOST=\"}
-	portageCHOST=${portageCHOST%\"}
-	XHOST=`echo $portageCHOST | sed -e 's/-[^-]*/&_cross/'`
-
 	emerge_pkgs() {
 		local opts=$1 ; shift
 		local pkg vdb pvdb evdb
@@ -1209,6 +1067,8 @@ bootstrap_stage3() {
 		done
 	}
 
+	# These tools are built against the system CHOST, not the prefix CHOST;
+	# They get replaced later on in the emerge -e system.
 	# --oneshot --nodeps
 	local pkgs=(
 		sys-apps/sed
@@ -1221,21 +1081,77 @@ bootstrap_stage3() {
 		sys-devel/patch
 		sys-devel/binutils-config
 		sys-devel/gcc-config
-		sys-kernel/linux-headers:0
 	)
 	emerge_pkgs --nodeps "${pkgs[@]}" || return 1
 
-	[[ -e "${EPREFIX}/tmp/usr/bin/${portageCHOST}-ld" ]] || bootstrap_binutils_1 || return 1
-	[[ -e "${EPREFIX}/tmp/usr/bin/${portageCHOST}-gcc" ]] || bootstrap_gcc_1 || return 1
+	local portageCHOST=$(emerge --info 2>/dev/null | grep '^CHOST=')
+	portageCHOST=${portageCHOST#CHOST=\"}
+	portageCHOST=${portageCHOST%\"}
+	XHOST=`echo $portageCHOST | sed -e 's/-[^-]*/&_cross/'`
 
-	FEATURES=-collision-protect ac_cv_path_PERL=no ac_cv_header_cpuid_h=yes libc_cv_c_cleanup=yes libc_cv_ctors_header=yes libc_cv_forced_unwind=yes emerge_pkgs --nodeps "=sys-libs/glibc-2.14" || return 1
+	# We're going to replace random toolchain components by native ones
+	# later on, so compile the cross-versions statically wherever possible.
+	if [[ ! -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/gcc-bin && ! -d ${EPREFIX}/usr/bin/gcc ]]; then
+		export CFLAGS=-I${EPREFIX}/usr/include
+		export LDFLAGS=-L${EPREFIX}/usr/lib
+		
+		[[ -f ${EPREFIX}/usr/lib/libmpc.la ]] || EXTRA_ECONF=--disable-shared USE=static-libs emerge --oneshot dev-libs/mpc || return 1
+		[[ -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/binutils-bin ]] || EXTRA_ECONF=--disable-shared USE="static-libs -cxx nocxx -zlib" CHOST=$XHOST CTARGET=$portageCHOST emerge --nodeps --oneshot binutils || return 1
+		EXTRA_ECONF=--disable-decimal-float USE="crosscompile_opts_bootstrap -cxx nocxx -openmp -mudflap" CHOST=$XHOST CTARGET=$portageCHOST emerge --nodeps --oneshot gcc || return 1
+		emerge -C mpc mpfr gmp || return 1
+		
+		unset CFLAGS
+		unset LDFLAGS
+	fi
 
-	USE=-zlib emerge_pkgs --nodeps sys-devel/binutils || return 1
+	export CBUILD=$XHOST
+	export CHOST=$portageCHOST
+	export CC="${portageCHOST}-gcc --sysroot=/. -isystem ${EPREFIX}/usr/include"
 
-	CC="${portageCHOST}-gcc" emerge_pkgs --nodeps "=sys-devel/gcc-4.2*" || return 1
+	emerge_pkgs --nodeps linux-headers:0 || return 1
+
+	ac_cv_path_PERL=no \
+	ac_cv_header_cpuid_h=yes \
+	libc_cv_c_cleanup=yes \
+	libc_cv_ctors_header=yes \
+	libc_cv_forced_unwind=yes \
+	emerge_pkgs --nodeps "=sys-libs/glibc-2.14" || return 1
+
+	USE=-cxx emerge_pkgs "" dev-libs/mpc || return 1
+	USE=-cxx emerge_pkgs "" sys-libs/zlib || return 1
+
+	# binutils needs sysroot support to work with the currently-installed 
+	# cross-gcc, and --with-sysroot=/. is safe in any system.
+	[[ -e ${EPREFIX}/usr/bin/ld ]] || EXTRA_ECONF=--with-sysroot=/. USE="-cxx" emerge --oneshot --nodeps binutils || return 1
+	binutils-config $(binutils-config -l | wc -l)
+
+	# cross-gcc needs its binutils at an unusual place.
+	pushd ${EPREFIX}/usr/libexec/gcc/${portageCHOST} >/dev/null
+	for file in $(find -maxdepth 1 -type l); do
+		rm $file
+		ln -s ../../../bin/$file $file
+	done
+	popd >/dev/null
+
+	# We need a native gcc here.
+	[[ -e ${EPREFIX}/usr/bin/gcc ]] || CBUILD=$CHOST emerge --oneshot --nodeps gcc
+	gcc-config $(gcc-config -l | wc -l)
+
+	pushd ${EPREFIX}/usr/libexec/gcc/${portageCHOST} >/dev/null
+	for file in $(find -maxdepth 1 -type l); do
+		rm $file
+	done
+	popd >/dev/null
+
+	unset CBUILD
+	unset CHOST
+	unset CC
 
 	# TODO: Remove this when bootstrapped-portage uses the ldconfig patch
 	"${EPREFIX}"/usr/sbin/ldconfig
+
+	# Clean up any remaining cross-toolkit junk.
+	rm -rf ${EPREFIX}/usr/${XHOST}
 
 	# we need pax-utils this early for OSX (before libiconv - gen_usr_ldscript)
 	# but also for perl, which uses scanelf/scanmacho to find compatible
@@ -1296,7 +1212,6 @@ bootstrap_stage3() {
 	treedate=$(date -f "${ROOT}"/usr/portage/metadata/timestamp +%s)
 	nowdate=$(date +%s)
 	[[ $(< ${ROOT}/etc/portage/make.profile/make.defaults) != *"PORTAGE_SYNC_STALE"* && $((nowdate - (60 * 60 * 24))) -lt ${treedate} ]] || emerge --sync || emerge-webrsync || return 1
-	emerge --sync
 	emerge --regen
 
 	local cpuflags=
