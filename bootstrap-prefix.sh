@@ -1123,7 +1123,7 @@ bootstrap_stage3() {
 	# binutils needs sysroot support to work with the currently-installed 
 	# cross-gcc, and --with-sysroot=/. is safe in any system.
 	[[ -e ${EPREFIX}/usr/bin/ld ]] || EXTRA_ECONF=--with-sysroot=/. USE="-cxx" emerge --oneshot --nodeps binutils || return 1
-	binutils-config $(binutils-config -l | wc -l)
+	binutils-config $(binutils-config -l | wc -l) || return 1
 
 	# cross-gcc needs its binutils at an unusual place.
 	pushd ${EPREFIX}/usr/libexec/gcc/${portageCHOST} >/dev/null
@@ -1134,8 +1134,8 @@ bootstrap_stage3() {
 	popd >/dev/null
 
 	# We need a native gcc here.
-	[[ -e ${EPREFIX}/usr/bin/gcc ]] || CBUILD=$CHOST emerge --oneshot --nodeps gcc
-	gcc-config $(gcc-config -l | wc -l)
+	[[ -e ${EPREFIX}/usr/bin/gcc ]] || CBUILD=$CHOST emerge --oneshot --nodeps gcc || return 1
+	gcc-config $(gcc-config -l | wc -l) || return 1
 
 	pushd ${EPREFIX}/usr/libexec/gcc/${portageCHOST} >/dev/null
 	for file in $(find -maxdepth 1 -type l); do
