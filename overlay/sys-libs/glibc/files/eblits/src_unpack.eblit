@@ -157,6 +157,11 @@ toolchain-glibc_src_unpack() {
 		fi
 	fi
 
+	# Prefix: have system() use ${EPREFIX}/bin/sh instead of /bin/sh.
+	grep -Rl '"/bin/sh"' * | while read file; do
+		sed -i "s:\"/bin/sh\":\"${EPREFIX}/bin/sh\":" $file
+	done
+
 	epatch_user
 
 	gnuconfig_update
