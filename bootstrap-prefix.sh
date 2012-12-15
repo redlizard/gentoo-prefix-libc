@@ -1084,6 +1084,9 @@ bootstrap_stage3() {
 	)
 	emerge_pkgs --nodeps "${pkgs[@]}" || return 1
 
+	# Build processes use this bash, so make sure to point it to a non-broken one.
+	sed -i "/BASH:/i export BASH=${EPREFIX}/bin/bash" ${EPREFIX}/usr/lib/portage/bin/ebuild-helpers/emake
+
 	local portageCHOST=$(emerge --info 2>/dev/null | grep '^CHOST=')
 	portageCHOST=${portageCHOST#CHOST=\"}
 	portageCHOST=${portageCHOST%\"}
