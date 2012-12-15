@@ -1092,6 +1092,9 @@ bootstrap_stage3() {
 	portageCHOST=${portageCHOST%\"}
 	XHOST=`echo $portageCHOST | sed -e 's/-[^-]*/&_cross/'`
 
+	export CBUILD=$XHOST
+	export CHOST=$XHOST
+
 	# We're going to replace random toolchain components by native ones
 	# later on, so compile the cross-versions statically wherever possible.
 	if [[ ! -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/gcc-bin && ! -d ${EPREFIX}/usr/bin/gcc ]]; then
@@ -1099,15 +1102,15 @@ bootstrap_stage3() {
 		export LDFLAGS=-L${EPREFIX}/usr/lib
 		
 		[[ -f ${EPREFIX}/usr/lib/libmpc.la ]] || EXTRA_ECONF=--disable-shared USE=static-libs emerge --oneshot dev-libs/mpc || return 1
-		[[ -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/binutils-bin ]] || EXTRA_ECONF=--disable-shared USE="static-libs -cxx nocxx -zlib" CHOST=$XHOST CTARGET=$portageCHOST emerge --nodeps --oneshot binutils || return 1
-		EXTRA_ECONF=--disable-decimal-float USE="crosscompile_opts_bootstrap -cxx nocxx -openmp -mudflap" CHOST=$XHOST CTARGET=$portageCHOST emerge --nodeps --oneshot gcc || return 1
+		[[ -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/binutils-bin ]] || EXTRA_ECONF=--disable-shared USE="static-libs -cxx nocxx -zlib" CTARGET=$portageCHOST emerge --nodeps --oneshot binutils || return 1
+		EXTRA_ECONF=--disable-decimal-float USE="crosscompile_opts_bootstrap -cxx nocxx -openmp -mudflap" CTARGET=$portageCHOST emerge --nodeps --oneshot gcc || return 1
 		emerge -C mpc mpfr gmp || return 1
 		
 		unset CFLAGS
 		unset LDFLAGS
 	fi
 
-	export CBUILD=$XHOST
+	# Compile native packages from now on.
 	export CHOST=$portageCHOST
 	export CC="${portageCHOST}-gcc --sysroot=/. -isystem ${EPREFIX}/usr/include"
 
@@ -1136,7 +1139,7 @@ bootstrap_stage3() {
 	done
 	popd >/dev/null
 
-	# We need a native gcc here.
+	# We need a natively-build gcc here, so force CBUILD=CHOST=CTARGET.
 	[[ -e ${EPREFIX}/usr/bin/gcc ]] || CBUILD=$CHOST emerge --oneshot --nodeps gcc || return 1
 	gcc-config $(gcc-config -l | wc -l) || return 1
 
