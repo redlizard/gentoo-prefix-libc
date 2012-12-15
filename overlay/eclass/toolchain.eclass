@@ -814,6 +814,12 @@ toolchain_src_unpack() {
 		eend $?
 	done
 	sed -i 's|A-Za-z0-9|[:alnum:]|g' "${S}"/gcc/*.awk #215828
+	for f in $(find "${S}" -name configure); do
+		sed -i 's:/bin$PATH_SEPARATOR/usr/bin$PATH_SEPARATOR$PATH:$PATH$PATH_SEPARATOR/bin$PATH_SEPARATOR/usr/bin:' $f
+		sed -i "s:#! /bin/sh:#! ${EPREFIX}/bin/bash:" $f
+	done
+	sed -i "s:#! /bin/sh:#! ${EPREFIX}/bin/bash:" "${S}"/gcc/exec-tool.in
+	sed -i "s:#!/bin/sh:#! ${EPREFIX}/bin/bash:" "${S}"/move-if-change
 
 	if [[ -x contrib/gcc_update ]] ; then
 		einfo "Touching generated files"
