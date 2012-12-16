@@ -1040,30 +1040,8 @@ bootstrap_stage3() {
 		local opts=$1 ; shift
 		local pkg vdb pvdb evdb
 		for pkg in "$@"; do
-			vdb=${pkg}
-			if [[ ${vdb} == "="* ]] ; then
-				vdb=${vdb#=}
-				vdb=${vdb%-*}
-			fi
-			if [[ ${vdb} == "<"* ]] ; then
-				vdb=${vdb#<}
-				vdb=${vdb%-r*}
-				vdb=${vdb%-*}
-			fi
-			if [[ ${vdb} == *":"* ]] ; then
-				vdb=${vdb%:*}
-			fi
-			for pvdb in ${ROOT}/var/db/pkg/${vdb}-* ; do
-				if [[ -d ${pvdb} ]] ; then
-					evdb=${pvdb##*/}
-					evdb=${evdb%-r*}
-					evdb=${evdb%_p*}
-					evdb=${evdb%-*}
-					[[ ${evdb} == ${vdb#*/} ]] && break
-				fi
-				pvdb=
-			done
-			[[ -n ${pvdb} ]] || emerge --oneshot ${opts} "${pkg}" || return 1
+			matches=$(portageq match "${EPREFIX}" "${pkg}")
+			[[ -n "${matches}" ]] || emerge --oneshot ${opts} "${pkg}" || return 1
 		done
 	}
 
