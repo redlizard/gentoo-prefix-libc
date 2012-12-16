@@ -1036,6 +1036,8 @@ bootstrap_stage3() {
 	local bootstrapCHOST=${CHOST}
 	unset CHOST
 
+	export PYTHONPATH="${EPREFIX}"/usr/lib/portage/pym
+
 	emerge_pkgs() {
 		local opts=$1 ; shift
 		local pkg vdb pvdb evdb
