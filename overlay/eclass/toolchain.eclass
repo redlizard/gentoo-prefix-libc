@@ -1252,7 +1252,11 @@ gcc_do_configure() {
 	esac
 	fi
 
-	confgcc+=" --with-native-system-header-dir=${EPREFIX}/usr/include"
+	if tc_version_is_at_least 4.7; then
+		confgcc+=" --with-native-system-header-dir=${EPREFIX}/usr/include"
+	else
+		sed -i "s:NATIVE_SYSTEM_HEADER_DIR = /usr/include:NATIVE_SYSTEM_HEADER_DIR = ${EPREFIX}/usr/include:" "${S}"/gcc/Makefile.in
+	fi
 
 	tc_version_is_at_least 4.3 && set -- "$@" \
 		--with-bugurl=http://bugs.gentoo.org/ \
@@ -1491,8 +1495,10 @@ toolchain_src_compile() {
 		cp -u $file{,.orig}
 		sed -e "s@/lib\(64\)\?\(32\)\?/ld@${EPREFIX}/lib/ld@g" -e "s@/usr@${EPREFIX}&@g" $file.orig > $file
 		echo "
+#undef STANDARD_INCLUDE_DIR
 #undef STANDARD_STARTFILE_PREFIX
 #undef STANDARD_STARTFILE_PREFIX_2
+#define STANDARD_INCLUDE_DIR \"${EPREFIX}/usr/include\"
 #define STANDARD_STARTFILE_PREFIX \"${EPREFIX}/usr/lib/\"
 #define STANDARD_STARTFILE_PREFIX_2 \"\"
 " >> $file
