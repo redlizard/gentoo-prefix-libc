@@ -1097,7 +1097,7 @@ bootstrap_stage3() {
 
 	# We're going to replace random toolchain components by native ones
 	# later on, so compile the cross-versions statically wherever possible.
-	if [[ ! -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/gcc-bin && ! -d ${EPREFIX}/usr/bin/gcc ]]; then
+	if [[ ! -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/gcc-bin && ! -e ${EPREFIX}/usr/bin/gcc ]]; then
 		oldCFLAGS="$CFLAGS"
 		oldLDFLAGS="$LDFLAGS"
 		export CFLAGS="$(portageq envvar CFLAGS) -I${EPREFIX}/usr/include"
