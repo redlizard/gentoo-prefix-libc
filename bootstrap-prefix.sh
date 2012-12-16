@@ -1098,14 +1098,18 @@ bootstrap_stage3() {
 	# We're going to replace random toolchain components by native ones
 	# later on, so compile the cross-versions statically wherever possible.
 	if [[ ! -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/gcc-bin && ! -d ${EPREFIX}/usr/bin/gcc ]]; then
-		export CFLAGS=-I${EPREFIX}/usr/include
-		export LDFLAGS=-L${EPREFIX}/usr/lib
+		oldCFLAGS="$CFLAGS"
+		oldLDFLAGS="$LDFLAGS"
+		export CFLAGS="$(portageq envvar CFLAGS) -I${EPREFIX}/usr/include"
+		export LDFLAGS="$(portageq envvar LDFLAGS) -L${EPREFIX}/usr/lib"
 		
 		[[ -f ${EPREFIX}/usr/lib/libmpc.la ]] || EXTRA_ECONF=--disable-shared USE=static-libs emerge --oneshot dev-libs/mpc || return 1
 		[[ -d ${EPREFIX}/usr/${XHOST}/${portageCHOST}/binutils-bin ]] || EXTRA_ECONF=--disable-shared USE="static-libs -cxx nocxx -zlib" CTARGET=$portageCHOST emerge --nodeps --oneshot binutils || return 1
 		EXTRA_ECONF=--disable-decimal-float USE="crosscompile_opts_bootstrap -cxx nocxx -openmp -mudflap" CTARGET=$portageCHOST emerge --nodeps --oneshot gcc || return 1
 		emerge -C mpc mpfr gmp || return 1
 		
+		export CFLAGS="$oldCFLAGS"
+		export LDFLAGS="$oldLDFLAGS"
 		unset CFLAGS
 		unset LDFLAGS
 	fi
