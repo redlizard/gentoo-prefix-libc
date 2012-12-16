@@ -1204,17 +1204,6 @@ bootstrap_stage3() {
 	[[ $(< ${ROOT}/etc/portage/make.profile/make.defaults) != *"PORTAGE_SYNC_STALE"* && $((nowdate - (60 * 60 * 24))) -lt ${treedate} ]] || emerge --sync || emerge-webrsync || return 1
 	emerge --regen
 
-	local cpuflags=
-	case ${bootstrapCHOST} in
-		*-darwin*)
-			: # gcc-apple is 4.2, so mpfr/mpc/gmp are not necessary
-			;;
-		*)
-			emerge_pkgs "" "<dev-libs/mpc-0.9" || return 1
-			;;
-	esac
-
-
 	# Portage should figure out itself what it needs to do, if anything
 	USE=-git emerge -u system || return 1
 
