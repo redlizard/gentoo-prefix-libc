@@ -189,6 +189,9 @@ toolchain-glibc_src_install() {
 	# Prevent overwriting of the /etc/localtime symlink.  We'll handle the
 	# creation of the "factory" symlink in pkg_postinst().
 	rm -f "${ED}"/etc/localtime
+
+	# 2.15 dumps some files in ${D}/var/db, and the prefix be damned.
+	rm -rf "${D}"/var
 }
 
 toolchain-glibc_headers_install() {
