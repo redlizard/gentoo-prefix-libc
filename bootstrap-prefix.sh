@@ -1105,7 +1105,7 @@ bootstrap_stage3() {
 	libc_cv_c_cleanup=yes \
 	libc_cv_ctors_header=yes \
 	libc_cv_forced_unwind=yes \
-	emerge_pkgs --nodeps "=sys-libs/glibc-2.14" || return 1
+	emerge_pkgs --nodeps sys-libs/glibc || return 1
 
 	USE=-cxx emerge_pkgs "" dev-libs/mpc || return 1
 	USE=-cxx emerge_pkgs "" sys-libs/zlib || return 1
