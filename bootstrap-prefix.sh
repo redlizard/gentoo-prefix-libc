@@ -1008,9 +1008,7 @@ bootstrap_stage2() {
 
 	[[ -e ${ROOT}/etc/make.globals ]] || bootstrap_portage || return 1
 
-	if [[ ! -f $EPREFIX/etc/portage/make.conf ]] ; then
-		echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} $EPREFIX/../overlay\"" >> $EPREFIX/etc/portage/make.conf
-	fi
+	echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} $EPREFIX/../overlay\"" >> $EPREFIX/etc/portage/make.conf
 	cp $EPREFIX/../overlay/repos.conf $ROOT/etc/portage
 	emerge --regen
 
@@ -1207,13 +1205,11 @@ bootstrap_stage3() {
 	# Portage should figure out itself what it needs to do, if anything
 	USE=-git emerge -u system || return 1
 
-	rm -f $EPREFIX/etc/portage/make.conf
-	if [[ ! -f $EPREFIX/etc/portage/make.conf ]] ; then
-		echo 'USE="unicode nls"' >> $EPREFIX/etc/portage/make.conf
-		echo 'CFLAGS="${CFLAGS} -O2 -pipe"' >> $EPREFIX/etc/portage/make.conf
-		echo 'CXXFLAGS="${CFLAGS}"' >> $EPREFIX/etc/portage/make.conf
-		echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} $EPREFIX/../overlay\"" >> $EPREFIX/etc/portage/make.conf
-	fi
+	MAKECONF="${EPREFIX}"/etc/portage/make.conf
+	touch "${MAKECONF}"
+	grep -E '\bUSE\b' "${MAKECONF}" >/dev/null || echo 'USE="unicode nls"' >> "${MAKECONF}"
+	grep -E '\bCFLAGS\b' "${MAKECONF}" >/dev/null || echo 'CFLAGS="${CFLAGS} -O2 -pipe"' >> "${MAKECONF}"
+	grep -E '\bCXXFLAGS\b' "${MAKECONF}" > /dev/null || echo 'CXXFLAGS="${CFLAGS}"' >> "${MAKECONF}"
 
 	# activate last compiler
 	gcc-config $(gcc-config -l | wc -l)
