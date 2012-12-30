@@ -1008,8 +1008,8 @@ bootstrap_stage2() {
 
 	[[ -e ${ROOT}/etc/make.globals ]] || bootstrap_portage || return 1
 
-	echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} $EPREFIX/../overlay\"" >> $EPREFIX/etc/portage/make.conf
-	cp $EPREFIX/../overlay/repos.conf $ROOT/etc/portage
+	echo "PORTDIR_OVERLAY=\"\${PORTDIR_OVERLAY} ${SCRIPT_ROOT}/overlay\"" >> $EPREFIX/etc/portage/make.conf
+	cp "${SCRIPT_ROOT}"/overlay/repos.conf $ROOT/etc/portage
 	emerge --regen
 
 	einfo "stage2 successfully finished"
@@ -2103,6 +2103,7 @@ SNAPSHOT_URL="http://files.prefix.freens.org/snapshots"
 GNU_URL=${GNU_URL:="http://ftp.gnu.org/gnu"}
 GENTOO_MIRRORS=${GENTOO_MIRRORS:="http://distfiles.gentoo.org"}
 GCC_APPLE_URL="http://www.opensource.apple.com/darwinsource/tarballs/other"
+SCRIPT_ROOT="$( cd "$( dirname "$0" )" && pwd )"
 
 export MAKE
 
